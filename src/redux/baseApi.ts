@@ -1,15 +1,19 @@
-// src/redux/baseApi.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 export const baseApi = createApi({
-  reducerPath: "api", // Unique key for the store
+  reducerPath: "api",
   baseQuery: fetchBaseQuery({
-    baseUrl: "http://localhost:3000", // Change to your backend API URL
-    credentials: "include", // Allow cookies for auth
-    prepareHeaders: (headers) => {
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
+    baseUrl: import.meta.env.VITE_REACT_BACKEND_URL, // your backend API
+    credentials: "include",
+    // prepareHeaders: (headers, { endpoint, getState, extra, type }) => {
+    //   // Only set JSON content type if not sending FormData
+    //   const isFormData = (extra as any)?.isFormData;
+
+    //   if (!isFormData) {
+    //     headers.set("Content-Type", "application/json");
+    //   }
+    //   return headers;
+    // },
   }),
-  endpoints: () => ({}), // We will inject endpoints later
+  endpoints: () => ({}),
 });

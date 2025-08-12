@@ -3,6 +3,7 @@ import { FaHome, FaUserFriends, FaBell, FaSearch } from "react-icons/fa";
 import { FiLogOut, FiSettings } from "react-icons/fi";
 import { FaRegMessage } from "react-icons/fa6";
 import { useLogoutMutation } from "../../redux/features/authApi"; // adjust path as needed
+import { Link } from "react-router-dom";
 
 const Navbar = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -92,20 +93,31 @@ const Navbar = () => {
           {dropdownOpen && (
             <div className="absolute right-0 mt-3 w-44 bg-white shadow-xl rounded-lg transition-opacity duration-300 z-50">
               <ul className="py-2">
-                <li className="px-5 py-3 hover:bg-gray-100 flex items-center space-x-3 cursor-pointer transition-colors duration-150">
-                  <FiSettings className="text-lg" />
-                  <span className="font-medium text-gray-700">Settings</span>
+                <li className="hover:bg-gray-100 transition-colors duration-150">
+                  <Link
+                    to="/userprofile"
+                    className="px-5 py-3 flex items-center space-x-3 cursor-pointer"
+                  >
+                    <FiSettings className="text-lg" />
+                    <span className="font-medium text-gray-700">Profile</span>
+                  </Link>
                 </li>
+
                 <li
-                  className={`px-5 py-3 hover:bg-gray-100 flex items-center space-x-3 cursor-pointer transition-colors duration-150 ${
+                  className={`hover:bg-gray-100 transition-colors duration-150 ${
                     isLoading ? "opacity-50 cursor-not-allowed" : ""
                   }`}
-                  onClick={() => !isLoading && handleSignOut()}
                 >
-                  <FiLogOut className="text-lg" />
-                  <span className="font-medium text-gray-700">
-                    {isLoading ? "Signing Out..." : "Sign Out"}
-                  </span>
+                  <button
+                    onClick={() => !isLoading && handleSignOut()}
+                    className="px-5 py-3 flex items-center space-x-3 w-full text-left"
+                    disabled={isLoading}
+                  >
+                    <FiLogOut className="text-lg" />
+                    <span className="font-medium text-gray-700">
+                      {isLoading ? "Signing Out..." : "Sign Out"}
+                    </span>
+                  </button>
                 </li>
               </ul>
             </div>
