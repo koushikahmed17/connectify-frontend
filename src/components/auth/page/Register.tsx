@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { useRegisterMutation } from "../../../redux/features/authApi";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -10,6 +13,7 @@ function Register() {
 
   const [error, setError] = useState("");
   const [register, { isLoading }] = useRegisterMutation();
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({
@@ -32,11 +36,17 @@ function Register() {
     }
 
     try {
-      const result = await register(formData).unwrap(); // unwrap to catch errors
-      alert("Registration successful! You can now log in.");
+      await register(formData).unwrap();
+      toast.success("Registration successful! You can now log in.");
       setFormData({ email: "", username: "", password: "" });
+
+      // Redirect after short delay so toast is visible
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
     } catch (err) {
       setError(err?.data?.message || "Failed to register.");
+      toast.error(err?.data?.message || "Failed to register.");
     }
   };
 
