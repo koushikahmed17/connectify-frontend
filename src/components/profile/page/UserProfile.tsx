@@ -15,6 +15,7 @@ import {
   useCreateProfileMutation,
 } from "../../../redux/features/userProfile";
 import { useGetMeQuery } from "../../../redux/features/authApi";
+import { toast } from "react-toastify";
 
 type ProfileType = {
   id?: number;
@@ -96,29 +97,51 @@ const UserProfile: React.FC = () => {
 
   const handleSave = async () => {
     try {
+      // Validate required fields
+      if (!fullName.trim()) {
+        toast.error("Display name is required");
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("displayName", fullName);
-      formData.append("bio", bio);
-      formData.append("website", website);
-      formData.append("location", location);
+      formData.append("displayName", fullName.trim());
+      formData.append("bio", bio || "");
+      formData.append("website", website || "");
+      formData.append("location", location || "");
 
       if (avatarFile) formData.append("avatar", avatarFile);
       if (coverPhotoFile) formData.append("coverPhoto", coverPhotoFile);
 
+      console.log("Sending FormData:", {
+        displayName: fullName.trim(),
+        bio: bio || "",
+        website: website || "",
+        location: location || "",
+        hasAvatar: !!avatarFile,
+        hasCoverPhoto: !!coverPhotoFile,
+      });
+
       if (profile && Object.keys(profile).length > 0) {
         // Profile exists → Update
+        console.log("Updating existing profile...");
         await updateProfile(formData).unwrap();
+        toast.success("Profile updated successfully!");
       } else {
         // No profile → Create
+        console.log("Creating new profile...");
         await createProfile(formData).unwrap();
+        toast.success("Profile created successfully!");
       }
 
       setIsEditing(false);
       setAvatarFile(null);
       setCoverPhotoFile(null);
       refetch();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Save failed:", err);
+      toast.error(
+        `Save failed: ${err?.data?.message || err?.message || "Unknown error"}`
+      );
     }
   };
 

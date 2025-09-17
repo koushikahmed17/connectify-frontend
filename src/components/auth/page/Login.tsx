@@ -16,8 +16,8 @@ function Login() {
     setError("");
 
     try {
-      const userData = await login(formData).unwrap();
-      dispatch(setUser(userData)); // save user in redux store
+      const response = await login(formData).unwrap();
+      dispatch(setUser(response.user)); // save user in redux store
       navigate("/"); // redirect to home page
     } catch (err) {
       if (err?.data?.message) {

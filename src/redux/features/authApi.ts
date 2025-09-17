@@ -2,12 +2,21 @@
 // src/redux/features/authApi.ts
 import { baseApi } from "../baseApi";
 
+interface UserResponse {
+  id: number;
+  username: string;
+  email: string;
+  profile?: {
+    displayName?: string;
+    avatar?: {
+      url: string;
+    };
+  };
+}
+
 export const authApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    login: build.mutation<
-      { id: number; username: string; email: string },
-      { email: string; password: string }
-    >({
+    login: build.mutation<UserResponse, { email: string; password: string }>({
       query: (credentials) => ({
         url: "/auth/login",
         method: "POST",
@@ -33,7 +42,7 @@ export const authApi = baseApi.injectEndpoints({
       }),
     }),
 
-    getMe: build.query<{ id: number; username: string; email: string }, void>({
+    getMe: build.query<UserResponse, void>({
       query: () => ({
         url: "/auth/me",
         method: "GET",

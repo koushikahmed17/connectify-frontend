@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FaHome, FaUserFriends, FaBell, FaSearch } from "react-icons/fa";
+import { FaHome, FaUserFriends, FaSearch } from "react-icons/fa";
 import { FiLogOut, FiSettings } from "react-icons/fi";
 import { FaRegMessage } from "react-icons/fa6";
 import { useLogoutMutation } from "../../redux/features/authApi"; // adjust path as needed
 import { Link } from "react-router-dom";
+import NotificationDropdown from "../dashboard/components/NotificationDropdown";
 
 const Navbar = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -65,21 +66,19 @@ const Navbar = () => {
 
       {/* Right side - Navigation & Profile */}
       <div className="flex items-center space-x-6 text-gray-700">
-        {[FaHome, FaUserFriends, FaRegMessage, FaBell].map((Icon, i) => (
-          <Icon
-            key={i}
-            className="text-xl cursor-pointer transition-colors duration-200 hover:text-blue-600"
-            title={
-              Icon === FaHome
-                ? "Home"
-                : Icon === FaUserFriends
-                ? "Friends"
-                : Icon === FaRegMessage
-                ? "Messages"
-                : "Notifications"
-            }
-          />
-        ))}
+        <FaHome
+          className="text-xl cursor-pointer transition-colors duration-200 hover:text-blue-600"
+          title="Home"
+        />
+        <FaUserFriends
+          className="text-xl cursor-pointer transition-colors duration-200 hover:text-blue-600"
+          title="Friends"
+        />
+        <FaRegMessage
+          className="text-xl cursor-pointer transition-colors duration-200 hover:text-blue-600"
+          title="Messages"
+        />
+        <NotificationDropdown />
 
         {/* Profile dropdown */}
         <div className="relative" ref={dropdownRef}>
