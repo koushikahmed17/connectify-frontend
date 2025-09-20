@@ -51,6 +51,8 @@ const userSlice = createSlice({
       state.email = null;
       state.profile = undefined;
       state.isAuthenticated = false;
+      // Clear token from localStorage
+      localStorage.removeItem("access_token");
     },
   },
 });

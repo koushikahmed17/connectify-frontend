@@ -1,6 +1,22 @@
 // src/redux/features/authApi.ts
-// src/redux/features/authApi.ts
 import { baseApi } from "../baseApi";
+
+interface LoginResponse {
+  success: boolean;
+  message: string;
+  access_token: string;
+  user: {
+    id: number;
+    username: string;
+    email: string;
+    profile?: {
+      displayName?: string;
+      avatar?: {
+        url: string;
+      };
+    };
+  };
+}
 
 interface UserResponse {
   id: number;
@@ -16,7 +32,7 @@ interface UserResponse {
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (build) => ({
-    login: build.mutation<UserResponse, { email: string; password: string }>({
+    login: build.mutation<LoginResponse, { email: string; password: string }>({
       query: (credentials) => ({
         url: "/auth/login",
         method: "POST",
@@ -47,6 +63,13 @@ export const authApi = baseApi.injectEndpoints({
         url: "/auth/me",
         method: "GET",
       }),
+      transformResponse: (response: {
+        success: boolean;
+        message: string;
+        data: UserResponse;
+      }) => {
+        return response.data;
+      },
     }),
   }),
   overrideExisting: false,

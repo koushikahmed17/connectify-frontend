@@ -1,5 +1,5 @@
 interface ImportMetaEnv {
-  readonly VITE_REACT_BACKEND_URL: string;
+  readonly VITE_API_URL: string;
   // add more env variables here as needed
 }
 

@@ -6,6 +6,10 @@ import Login from "../components/auth/page/Login";
 import Register from "../components/auth/page/Register";
 import ProtectedRoute from "./ProtectedRoute";
 import UserProfile from "../components/profile/page/UserProfile";
+import PublicProfile from "../components/profile/page/PublicProfile";
+import PostDetail from "../components/posts/page/PostDetail";
+import FollowManagement from "../components/follow/FollowManagement";
+import FollowTest from "../components/follow/FollowTest";
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +28,46 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      {
+        path: "connections",
+        element: (
+          <ProtectedRoute>
+            <FollowManagement />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "userProfile",
+        element: (
+          <ProtectedRoute>
+            <UserProfile />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "profile/:userId",
+        element: (
+          <ProtectedRoute>
+            <PublicProfile />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "post/:postId",
+        element: (
+          <ProtectedRoute>
+            <PostDetail />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "follow-test",
+        element: (
+          <ProtectedRoute>
+            <FollowTest />
+          </ProtectedRoute>
+        ),
+      },
     ],
   },
   {
@@ -33,13 +77,5 @@ export const router = createBrowserRouter([
   {
     path: "/register",
     element: <Register />,
-  },
-  {
-    path: "/userProfile",
-    element: (
-      <ProtectedRoute>
-        <UserProfile />
-      </ProtectedRoute>
-    ),
   },
 ]);
