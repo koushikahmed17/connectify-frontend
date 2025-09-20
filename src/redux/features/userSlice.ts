@@ -6,6 +6,12 @@ interface UserState {
   username: string;
   email: string | null;
   isAuthenticated: boolean;
+  profile?: {
+    displayName?: string;
+    avatar?: {
+      url: string;
+    };
+  };
 }
 
 const initialState: UserState = {
@@ -21,18 +27,32 @@ const userSlice = createSlice({
   reducers: {
     setUser(
       state,
-      action: PayloadAction<{ id: number; username: string; email: string }>
+      action: PayloadAction<{
+        id: number;
+        username: string;
+        email: string;
+        profile?: {
+          displayName?: string;
+          avatar?: {
+            url: string;
+          };
+        };
+      }>
     ) {
       state.id = action.payload.id;
       state.username = action.payload.username;
       state.email = action.payload.email;
+      state.profile = action.payload.profile;
       state.isAuthenticated = true;
     },
     clearUser(state) {
       state.id = null;
       state.username = "";
       state.email = null;
+      state.profile = undefined;
       state.isAuthenticated = false;
+      // Clear token from localStorage
+      localStorage.removeItem("access_token");
     },
   },
 });
