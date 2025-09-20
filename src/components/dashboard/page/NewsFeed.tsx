@@ -17,9 +17,12 @@ import {
   useGetCommentsQuery,
   Post,
 } from "../../../redux/features/postsApi";
+import CommentItem from "../../posts/components/CommentItem";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux/Store";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
+import { getAvatarUrl, handleAvatarError } from "../../../utils/avatarUtils";
 
 const NewsFeed: React.FC = () => {
   const [editingPost, setEditingPost] = useState<number | null>(null);
@@ -28,10 +31,28 @@ const NewsFeed: React.FC = () => {
   const [showComments, setShowComments] = useState<number | null>(null);
   const [commentContent, setCommentContent] = useState("");
   const moreOptionsRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  // Fetch comments for the post when comments are shown
+  const {
+    data: commentsData,
+    isLoading: commentsLoading,
+    refetch: refetchComments,
+  } = useGetCommentsQuery(
+    { postId: showComments || 0 },
+    { skip: !showComments }
+  );
 
   const user = useSelector((state: RootState) => state.user);
   const { data: posts, isLoading, error, refetch } = useGetPostsQuery({});
   const [deletePost, { isLoading: isDeleting }] = useDeletePostMutation();
+
+  // Debug logging
+  console.log("NewsFeed - posts data:", posts);
+  console.log("NewsFeed - posts type:", typeof posts);
+  console.log("NewsFeed - is array:", Array.isArray(posts));
+  console.log("NewsFeed - isLoading:", isLoading);
+  console.log("NewsFeed - error:", error);
   const [updatePost, { isLoading: isUpdating }] = useUpdatePostMutation();
   const [toggleLike] = useToggleLikeMutation();
   const [addComment] = useAddCommentMutation();
@@ -62,10 +83,10 @@ const NewsFeed: React.FC = () => {
 
   const handleLike = async (postId: number) => {
     try {
-      await toggleLike(postId).unwrap();
+      const result = await toggleLike(postId).unwrap();
+      console.log("Like result:", result);
     } catch (error: any) {
       console.error("Error toggling like:", error);
-      toast.error("Failed to like post");
     }
   };
 
@@ -79,10 +100,8 @@ const NewsFeed: React.FC = () => {
     try {
       await addComment({ postId, content: commentContent.trim() }).unwrap();
       setCommentContent("");
-      toast.success("Comment added successfully!");
     } catch (error: any) {
       console.error("Error adding comment:", error);
-      toast.error("Failed to add comment");
     }
   };
 
@@ -170,18 +189,8 @@ const NewsFeed: React.FC = () => {
     return post.author.profile?.displayName || post.author.username;
   };
 
-  const getAvatarUrl = (post: Post) => {
-    if (post.author.profile?.avatar?.url) {
-      // If the URL is already a full URL, use it as is
-      if (post.author.profile.avatar.url.startsWith("http")) {
-        return post.author.profile.avatar.url;
-      }
-      // If it's a relative path, prepend the backend URL
-      return `${import.meta.env.VITE_REACT_BACKEND_URL}${
-        post.author.profile.avatar.url
-      }`;
-    }
-    return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face";
+  const handleUsernameClick = (userId: number) => {
+    navigate(`/profile/${userId}`);
   };
 
   if (isLoading) {
@@ -225,7 +234,7 @@ const NewsFeed: React.FC = () => {
     );
   }
 
-  if (!posts || posts.length === 0) {
+  if (!posts || !Array.isArray(posts) || posts.length === 0) {
     return (
       <div className="text-center py-12">
         <div className="text-gray-400 mb-4">
@@ -247,17 +256,43 @@ const NewsFeed: React.FC = () => {
           {/* Header */}
           <div className="flex items-center justify-between p-6">
             <div className="flex items-center space-x-4">
-              <img
-                src={getAvatarUrl(post)}
-                alt={getDisplayName(post)}
-                className="w-12 h-12 rounded-full object-cover"
-              />
+              <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 flex items-center justify-center">
+                <img
+                  src={getAvatarUrl(
+                    post.author,
+                    post.author.username?.charAt(0).toUpperCase()
+                  )}
+                  alt={getDisplayName(post)}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    const fallbackDiv = e.currentTarget
+                      .nextElementSibling as HTMLElement;
+                    if (fallbackDiv) {
+                      fallbackDiv.style.display = "flex";
+                    }
+                  }}
+                />
+                <div
+                  className="w-full h-full bg-purple-500 flex items-center justify-center"
+                  style={{ display: "none" }}
+                >
+                  <span className="text-white font-semibold text-lg">
+                    {post.author.username?.charAt(0).toUpperCase() || "U"}
+                  </span>
+                </div>
+              </div>
               <div>
                 <h3 className="font-semibold text-gray-900 text-base">
                   {getDisplayName(post)}
                 </h3>
                 <div className="flex items-center space-x-2 text-gray-500 text-sm">
-                  <span>@{post.author.username}</span>
+                  <button
+                    onClick={() => handleUsernameClick(post.author.id)}
+                    className="hover:text-blue-600 hover:underline transition-colors"
+                  >
+                    @{post.author.username}
+                  </button>
                   <span>•</span>
                   <span>{formatTimeAgo(post.createdAt)}</span>
                 </div>
@@ -361,7 +396,7 @@ const NewsFeed: React.FC = () => {
                 // Single media
                 post.medias[0].media.mimeType.startsWith("image/") ? (
                   <img
-                    src={`${import.meta.env.VITE_REACT_BACKEND_URL}${
+                    src={`${import.meta.env.VITE_API_URL}${
                       post.medias[0].media.url
                     }`}
                     alt={post.medias[0].altText || "Post content"}
@@ -369,7 +404,7 @@ const NewsFeed: React.FC = () => {
                   />
                 ) : (
                   <video
-                    src={`${import.meta.env.VITE_REACT_BACKEND_URL}${
+                    src={`${import.meta.env.VITE_API_URL}${
                       post.medias[0].media.url
                     }`}
                     controls
@@ -383,7 +418,7 @@ const NewsFeed: React.FC = () => {
                     <div key={media.id} className="relative">
                       {media.media.mimeType.startsWith("image/") ? (
                         <img
-                          src={`${import.meta.env.VITE_REACT_BACKEND_URL}${
+                          src={`${import.meta.env.VITE_API_URL}${
                             media.media.url
                           }`}
                           alt={media.altText || `Post media ${index + 1}`}
@@ -391,7 +426,7 @@ const NewsFeed: React.FC = () => {
                         />
                       ) : (
                         <video
-                          src={`${import.meta.env.VITE_REACT_BACKEND_URL}${
+                          src={`${import.meta.env.VITE_API_URL}${
                             media.media.url
                           }`}
                           controls
@@ -418,7 +453,9 @@ const NewsFeed: React.FC = () => {
               <button
                 onClick={() => handleLike(post.id)}
                 className={`flex items-center space-x-2 transition-colors group ${
-                  post.reactions.some((reaction) => reaction.userId === user.id)
+                  post.reactions.some(
+                    (reaction) => reaction.userId === Number(user.id)
+                  )
                     ? "text-red-500"
                     : "text-gray-500 hover:text-red-500"
                 }`}
@@ -426,7 +463,7 @@ const NewsFeed: React.FC = () => {
                 <Heart
                   className={`w-5 h-5 ${
                     post.reactions.some(
-                      (reaction) => reaction.userId === user.id
+                      (reaction) => reaction.userId === Number(user.id)
                     )
                       ? "fill-current"
                       : "group-hover:fill-current"
@@ -469,11 +506,32 @@ const NewsFeed: React.FC = () => {
             <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
               {/* Add Comment Form */}
               <div className="flex space-x-3 mb-4">
-                <img
-                  src={getAvatarUrl(post)}
-                  alt={getDisplayName(post)}
-                  className="w-8 h-8 rounded-full object-cover"
-                />
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0">
+                  <img
+                    src={getAvatarUrl(
+                      user,
+                      user.username?.charAt(0).toUpperCase()
+                    )}
+                    alt={getDisplayName(post)}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const fallbackDiv = e.currentTarget
+                        .nextElementSibling as HTMLElement;
+                      if (fallbackDiv) {
+                        fallbackDiv.style.display = "flex";
+                      }
+                    }}
+                  />
+                  <div
+                    className="w-full h-full bg-purple-500 flex items-center justify-center"
+                    style={{ display: "none" }}
+                  >
+                    <span className="text-white font-semibold text-sm">
+                      {user.username?.charAt(0).toUpperCase() || "U"}
+                    </span>
+                  </div>
+                </div>
                 <div className="flex-1 flex space-x-2">
                   <input
                     type="text"
@@ -499,42 +557,26 @@ const NewsFeed: React.FC = () => {
 
               {/* Comments List */}
               <div className="space-y-3">
-                {post.comments.map((comment) => (
-                  <div key={comment.id} className="flex space-x-3">
-                    <img
-                      src={
-                        comment.author.profile?.avatar?.url
-                          ? comment.author.profile.avatar.url.startsWith("http")
-                            ? comment.author.profile.avatar.url
-                            : `${import.meta.env.VITE_REACT_BACKEND_URL}${
-                                comment.author.profile.avatar.url
-                              }`
-                          : "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"
-                      }
-                      alt={
-                        comment.author.profile?.displayName ||
-                        comment.author.username
-                      }
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="bg-white rounded-lg px-3 py-2">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <span className="font-semibold text-sm text-gray-900">
-                            {comment.author.profile?.displayName ||
-                              comment.author.username}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {formatTimeAgo(comment.createdAt)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-800">
-                          {comment.content}
-                        </p>
-                      </div>
-                    </div>
+                {commentsLoading ? (
+                  <div className="flex justify-center py-4">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                ))}
+                ) : commentsData &&
+                  commentsData.data &&
+                  commentsData.data.length > 0 ? (
+                  commentsData.data.map((comment) => (
+                    <CommentItem
+                      key={comment.id}
+                      comment={comment}
+                      postId={post.id}
+                      onReplyAdded={refetchComments}
+                    />
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No comments yet. Be the first to comment!
+                  </div>
+                )}
               </div>
             </div>
           )}

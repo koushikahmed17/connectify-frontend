@@ -15,20 +15,36 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     (state: RootState) => state.user.isAuthenticated
   );
 
-  const { data, isLoading, isError } = useGetMeQuery();
+  // Check if token exists in localStorage
+  const hasToken = localStorage.getItem("access_token");
+
+  // Only make the API call if we have a token
+  const { data, isLoading, isError } = useGetMeQuery(undefined, {
+    skip: !hasToken, // Skip the query if no token
+  });
 
   // Local state to track if auth check has completed
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   useEffect(() => {
+    // If no token, clear user and mark as checked
+    if (!hasToken) {
+      dispatch(clearUser());
+      setHasCheckedAuth(true);
+      return;
+    }
+
+    // If we have data, set user
     if (data) {
       dispatch(setUser(data));
       setHasCheckedAuth(true);
-    } else if (isError) {
+    }
+    // If we have an error, clear user
+    else if (isError) {
       dispatch(clearUser());
       setHasCheckedAuth(true);
     }
-  }, [data, isError, dispatch]);
+  }, [data, isError, hasToken, dispatch]);
 
   // While loading or before we have completed the auth check, show loading
   if (isLoading || !hasCheckedAuth) {

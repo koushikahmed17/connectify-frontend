@@ -9,16 +9,49 @@ export const userProfileApi = baseApi.injectEndpoints({
         method: "GET",
         credentials: "include",
       }),
+      transformResponse: (response: any) => {
+        console.log("Profile API response:", response);
+        // Handle the API response structure
+        if (response.success && response.data) {
+          console.log("Profile data extracted:", response.data);
+          return response.data;
+        }
+        console.log("No profile data found in response");
+        return null;
+      },
+      providesTags: ["Profile"],
+    }),
+
+    // GET public profile
+    getPublicProfile: build.query({
+      query: (userId: number) => ({
+        url: `/user/profile/public/${userId}`,
+        method: "GET",
+        credentials: "include",
+      }),
+      transformResponse: (response: any) => {
+        if (response.success && response.data) {
+          return response.data;
+        }
+        return null;
+      },
     }),
 
     // CREATE profile (multipart/form-data)
     createProfile: build.mutation<any, FormData>({
       queryFn: async (formData) => {
         console.log("🚀 Sending FormData to create profile");
+
+        // Get token from localStorage
+        const token = localStorage.getItem("access_token");
+
         const response = await fetch(
-          `${import.meta.env.VITE_REACT_BACKEND_URL}/user/profile`,
+          `${import.meta.env.VITE_API_URL}/user/profile`,
           {
             method: "POST",
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
             body: formData,
             credentials: "include",
             // Don't set Content-Type - browser will set it with boundary
@@ -41,10 +74,17 @@ export const userProfileApi = baseApi.injectEndpoints({
     updateProfile: build.mutation<any, FormData>({
       queryFn: async (formData) => {
         console.log("🚀 Sending FormData to update profile");
+
+        // Get token from localStorage
+        const token = localStorage.getItem("access_token");
+
         const response = await fetch(
-          `${import.meta.env.VITE_REACT_BACKEND_URL}/user/profile`,
+          `${import.meta.env.VITE_API_URL}/user/profile`,
           {
             method: "PUT",
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
             body: formData,
             credentials: "include",
             // Don't set Content-Type - browser will set it with boundary
@@ -68,6 +108,7 @@ export const userProfileApi = baseApi.injectEndpoints({
 
 export const {
   useGetProfileQuery,
+  useGetPublicProfileQuery,
   useCreateProfileMutation,
   useUpdateProfileMutation,
 } = userProfileApi;

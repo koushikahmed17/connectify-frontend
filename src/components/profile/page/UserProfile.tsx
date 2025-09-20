@@ -15,6 +15,13 @@ import {
   useCreateProfileMutation,
 } from "../../../redux/features/userProfile";
 import { useGetMeQuery } from "../../../redux/features/authApi";
+import { useGetUserStatsQuery } from "../../../redux/features/followApi";
+import {
+  useUploadMediaMutation,
+  useCreatePostMutation,
+} from "../../../redux/features/postsApi";
+import FollowRequestsPanel from "../../follow/FollowRequestsPanel";
+import ProfilePostsSection from "../components/ProfilePostsSection";
 import { toast } from "react-toastify";
 
 type ProfileType = {
@@ -29,20 +36,37 @@ type ProfileType = {
 };
 
 const UserProfile: React.FC = () => {
-  // Fetch profile
+  // Backend base URL for images
+  const baseUrl = import.meta.env.VITE_API_URL || "";
+
+  // Fetch auth info for username & joined date
+  const { data: authUser, isLoading: authLoading } = useGetMeQuery();
+
+  // Fetch user stats
+  const { data: userStats, isLoading: statsLoading } = useGetUserStatsQuery(
+    {
+      userId: authUser?.id || 0,
+    },
+    {
+      skip: !authUser?.id,
+    }
+  );
+
+  // Fetch profile only when user is authenticated
   const {
     data: profile,
     isLoading,
     isError,
     refetch,
-  } = useGetProfileQuery(null);
-
-  // Fetch auth info for username & joined date
-  const { data: authUser } = useGetMeQuery();
+  } = useGetProfileQuery(undefined, {
+    skip: !authUser || authLoading, // Skip profile query if user is not authenticated or still loading
+  });
 
   // Mutations
   const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
   const [createProfile, { isLoading: isCreating }] = useCreateProfileMutation();
+  const [uploadMedia] = useUploadMediaMutation();
+  const [createPost] = useCreatePostMutation();
 
   const [isEditing, setIsEditing] = useState(false);
 
@@ -57,12 +81,45 @@ const UserProfile: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverPhotoFile, setCoverPhotoFile] = useState<File | null>(null);
 
-  // Backend base URL for images
-  const baseUrl = import.meta.env.VITE_REACT_BACKEND_URL || "";
+  // Debug logging
+  console.log("Profile query state:", {
+    profile,
+    isLoading,
+    isError,
+    authUser,
+    authLoading,
+  });
+
+  // Debug image URLs
+  if (profile) {
+    console.log("Profile avatar URL:", profile.avatar?.url);
+    console.log("Profile cover URL:", profile.coverPhoto?.url);
+    console.log("Base URL:", baseUrl);
+    console.log(
+      "Constructed avatar URL:",
+      profile.avatar?.url
+        ? profile.avatar.url.startsWith("http")
+          ? profile.avatar.url
+          : baseUrl + profile.avatar.url
+        : "No avatar URL"
+    );
+    console.log(
+      "Constructed cover URL:",
+      profile.coverPhoto?.url
+        ? profile.coverPhoto.url.startsWith("http")
+          ? profile.coverPhoto.url
+          : baseUrl + profile.coverPhoto.url
+        : "No cover URL"
+    );
+  }
 
   // Populate form when profile changes
   useEffect(() => {
+    console.log("Profile data:", profile);
+    console.log("Auth user data:", authUser);
+
     if (profile && Object.keys(profile).length > 0) {
+      console.log("Setting profile data from API response");
       setFullName(profile.displayName || "");
       // Username comes from auth API, fallback to profile username
       setUsername(authUser?.username || profile.username || "");
@@ -70,6 +127,7 @@ const UserProfile: React.FC = () => {
       setLocation(profile.location || "");
       setWebsite(profile.website || "");
     } else {
+      console.log("No profile data, using defaults");
       setFullName("");
       setUsername(authUser?.username || "");
       setBio("");
@@ -81,6 +139,34 @@ const UserProfile: React.FC = () => {
   }, [profile, authUser]);
 
   const handleEdit = () => setIsEditing(true);
+
+  // Helper function to create a post for image uploads
+  const createImagePost = async (
+    imageFile: File,
+    postType: "profile" | "cover"
+  ) => {
+    try {
+      // Upload the image first
+      const mediaFormData = new FormData();
+      mediaFormData.append("file", imageFile);
+
+      const mediaResponse = await uploadMedia(mediaFormData).unwrap();
+
+      if (mediaResponse.success && mediaResponse.data) {
+        // Create a post with the uploaded image (no caption)
+        const postData = {
+          content: "",
+          mediaIds: [mediaResponse.data.id],
+        };
+
+        await createPost(postData).unwrap();
+        console.log(`${postType} image post created successfully`);
+      }
+    } catch (error) {
+      console.error(`Failed to create ${postType} image post:`, error);
+      // Don't show error to user as the profile update was successful
+    }
+  };
 
   const handleCancel = () => {
     setIsEditing(false);
@@ -133,6 +219,14 @@ const UserProfile: React.FC = () => {
         toast.success("Profile created successfully!");
       }
 
+      // Create posts for uploaded images
+      if (avatarFile) {
+        await createImagePost(avatarFile, "profile");
+      }
+      if (coverPhotoFile) {
+        await createImagePost(coverPhotoFile, "cover");
+      }
+
       setIsEditing(false);
       setAvatarFile(null);
       setCoverPhotoFile(null);
@@ -156,7 +250,7 @@ const UserProfile: React.FC = () => {
     return date.toLocaleString("en-US", { month: "long", year: "numeric" });
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="text-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
@@ -185,11 +279,18 @@ const UserProfile: React.FC = () => {
             coverPhotoFile
               ? URL.createObjectURL(coverPhotoFile as Blob)
               : profile?.coverPhoto?.url
-              ? `${baseUrl}${profile.coverPhoto.url}`
+              ? profile.coverPhoto.url.startsWith("http")
+                ? profile.coverPhoto.url
+                : `${baseUrl}${profile.coverPhoto.url}`
               : "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80"
           }
           alt="Cover"
           className="w-full h-64 object-cover"
+          onError={(e) => {
+            console.log("Cover photo failed to load:", e.currentTarget.src);
+            e.currentTarget.src =
+              "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1470&q=80";
+          }}
         />
 
         {isEditing ? (
@@ -228,11 +329,18 @@ const UserProfile: React.FC = () => {
                 avatarFile
                   ? URL.createObjectURL(avatarFile)
                   : profile?.avatar?.url
-                  ? baseUrl + profile.avatar.url
+                  ? profile.avatar.url.startsWith("http")
+                    ? profile.avatar.url
+                    : baseUrl + profile.avatar.url
                   : "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=687&q=80"
               }
               alt="Profile"
               className="w-36 h-36 rounded-full border-4 border-white object-cover shadow-lg"
+              onError={(e) => {
+                console.log("Avatar failed to load:", e.currentTarget.src);
+                e.currentTarget.src =
+                  "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=687&q=80";
+              }}
             />
             {isEditing && (
               <label className="absolute bottom-2 right-2 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full cursor-pointer shadow-lg transition-all">
@@ -408,11 +516,15 @@ const UserProfile: React.FC = () => {
 
             <div className="mt-6 flex space-x-8">
               <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">1,234</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {statsLoading ? "..." : userStats?.followingCount || 0}
+                </div>
                 <div className="text-sm text-gray-500">Following</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">5,678</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {statsLoading ? "..." : userStats?.followersCount || 0}
+                </div>
                 <div className="text-sm text-gray-500">Followers</div>
               </div>
               <div className="text-center">
@@ -420,6 +532,21 @@ const UserProfile: React.FC = () => {
                 <div className="text-sm text-gray-500">Posts</div>
               </div>
             </div>
+
+            {/* Follow Requests Panel */}
+            <div className="mt-8">
+              <FollowRequestsPanel />
+            </div>
+
+            {/* Posts Section */}
+            <ProfilePostsSection
+              userId={authUser?.id || 0}
+              isOwnProfile={true}
+              profileData={{
+                avatar: profile?.avatar,
+                coverPhoto: profile?.coverPhoto,
+              }}
+            />
           </>
         )}
       </div>

@@ -4,9 +4,11 @@ import {
   useCreatePostMutation,
   useUploadMediaMutation,
 } from "../../../redux/features/postsApi";
+import { useGetMeQuery } from "../../../redux/features/authApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../redux/Store";
 import { toast } from "react-toastify";
+import { getAvatarUrl, handleAvatarError } from "../../../utils/avatarUtils";
 
 interface MediaFile {
   file: File;
@@ -24,11 +26,18 @@ const PostArea: React.FC = () => {
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const user = useSelector((state: RootState) => state.user);
+  const { data: userProfile, isLoading: profileLoading } = useGetMeQuery();
   const [createPost, { isLoading }] = useCreatePostMutation();
   const [uploadMedia] = useUploadMediaMutation();
 
   const handlePost = async () => {
     if (!postContent.trim() && mediaFiles.length === 0) return;
+
+    // Validate content length
+    if (postContent.trim().length > 2000) {
+      toast.error("Content must not exceed 2000 characters");
+      return;
+    }
 
     setIsPosting(true);
     setUploadingMedia(true);
@@ -50,24 +59,79 @@ const PostArea: React.FC = () => {
             "Size:",
             mediaFile.file.size
           );
+          console.log(
+            "Token before upload:",
+            localStorage.getItem("access_token")
+          );
 
           try {
             const response = await uploadMedia(formData).unwrap();
             console.log("Upload successful:", response);
-            mediaIds.push(response.id);
+
+            // The response is wrapped in ApiResponseDto, so the actual data is in response.data
+            const mediaData = response.data;
+            console.log("Media data:", mediaData);
+            console.log(
+              "Media ID:",
+              mediaData.id,
+              "Type:",
+              typeof mediaData.id
+            );
+
+            // Validate that the response has a valid numeric ID
+            if (
+              mediaData &&
+              typeof mediaData.id === "number" &&
+              !isNaN(mediaData.id)
+            ) {
+              mediaIds.push(mediaData.id);
+            } else {
+              console.error("Invalid media ID received:", mediaData.id);
+              throw new Error(`Invalid media ID received: ${mediaData.id}`);
+            }
           } catch (error: any) {
             console.error("Error uploading media:", error);
-            toast.error(`Failed to upload ${mediaFile.file.name}`);
+            console.error("Upload error details:", error.data);
+            console.error("Upload error status:", error.status);
+            toast.error(
+              `Failed to upload ${mediaFile.file.name}: ${
+                error.data?.message || error.message
+              }`
+            );
             throw error;
           }
         }
       }
 
       // Create post with content and media IDs
-      await createPost({
+      const postData: any = {
         content: postContent.trim(),
-        mediaIds: mediaIds.length > 0 ? mediaIds : undefined,
-      }).unwrap();
+      };
+
+      // Only add mediaIds if there are any
+      if (mediaIds.length > 0) {
+        postData.mediaIds = mediaIds;
+      }
+
+      console.log("Creating post with data:", postData);
+      console.log(
+        "Token in localStorage:",
+        localStorage.getItem("access_token")
+      );
+
+      try {
+        const result = await createPost(postData).unwrap();
+        console.log("Post created successfully:", result);
+      } catch (error: any) {
+        console.error("Post creation error details:", error);
+        console.error("Error status:", error.status);
+        console.error("Error data:", error.data);
+        console.error("Error message array:", error.data?.message);
+        if (Array.isArray(error.data?.message)) {
+          console.error("Validation errors:", error.data.message);
+        }
+        throw error;
+      }
 
       setPostContent("");
       setMediaFiles([]);
@@ -128,22 +192,8 @@ const PostArea: React.FC = () => {
   };
 
   const getDisplayName = () => {
-    return user.profile?.displayName || user.username || "User";
-  };
-
-  const getAvatarUrl = () => {
-    if (user.profile?.avatar?.url) {
-      // If the URL is already a full URL, use it as is
-      if (user.profile.avatar.url.startsWith("http")) {
-        return user.profile.avatar.url;
-      }
-      // If it's a relative path, prepend the backend URL
-      const fullUrl = `${import.meta.env.VITE_REACT_BACKEND_URL}${
-        user.profile.avatar.url
-      }`;
-      return fullUrl;
-    }
-    return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face";
+    const currentUser = userProfile || user;
+    return currentUser.profile?.displayName || currentUser.username || "User";
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -152,16 +202,79 @@ const PostArea: React.FC = () => {
     }
   };
 
+  // Don't render if user is not authenticated
+  if (!user.isAuthenticated) {
+    return null;
+  }
+
+  // Show loading state while profile is being fetched
+  if (profileLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-2">
+        <div className="flex space-x-4">
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 rounded-full bg-gray-200 animate-pulse"></div>
+          </div>
+          <div className="flex-1">
+            <div className="h-20 bg-gray-200 rounded-xl animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Use userProfile data if available, otherwise fall back to user state
+  const currentUser = userProfile || user;
+  const avatarUrl = getAvatarUrl(
+    currentUser,
+    currentUser.username?.charAt(0).toUpperCase()
+  );
+
+  // Debug logging
+  console.log("=== POSTAREA DEBUG ===");
+  console.log("User Profile from useGetMeQuery:", userProfile);
+  console.log("Basic User from Redux:", user);
+  console.log("Current User (selected):", currentUser);
+  console.log("Current User Profile:", currentUser.profile);
+  console.log("Current User Avatar:", currentUser.profile?.avatar);
+  console.log("Avatar URL Generated:", avatarUrl);
+  console.log("Backend URL:", import.meta.env.VITE_API_URL);
+  console.log("=====================");
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-2">
       <div className="flex space-x-4">
         {/* User Avatar */}
         <div className="flex-shrink-0">
-          <img
-            src={getAvatarUrl()}
-            alt={getDisplayName()}
-            className="w-12 h-12 rounded-full object-cover"
-          />
+          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 shadow-sm">
+            <img
+              src={avatarUrl}
+              alt={getDisplayName()}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Hide image and show fallback div
+                console.log("Avatar failed to load, using fallback");
+                const img = e.currentTarget;
+                const fallbackDiv = img.nextElementSibling as HTMLElement;
+                if (fallbackDiv) {
+                  img.style.display = "none";
+                  fallbackDiv.style.display = "flex";
+                }
+              }}
+              onLoad={() => {
+                // Image loaded successfully
+                console.log("Avatar loaded successfully");
+              }}
+            />
+            <div
+              className="w-full h-full bg-purple-500 flex items-center justify-center"
+              style={{ display: "none" }}
+            >
+              <span className="text-white font-semibold text-lg">
+                {currentUser.username?.charAt(0).toUpperCase() || "U"}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Post Input Area */}
